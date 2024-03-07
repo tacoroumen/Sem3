@@ -1,0 +1,28 @@
+---
+- name: Create a VM from a template
+  hosts: localhost
+  gather_facts: no
+  vars_prompt:
+    - name: "vm_name"
+      prompt: "Enter the name for the VM:"
+      private: no
+  tasks:
+    - name: Include vault file
+      include_vars: credentials.yml
+
+    - name: Clone the template
+      vmware_guest:
+        hostname: "{{ vmware_hostname }}"
+        username: "{{ vmware_username }}"
+        password: "{{ vmware_password }}"
+        validate_certs: False
+        name: "{{ vm_name }}"
+        template: "MPC_Template"
+        resource_pool: "I490343"
+        datacenter: "Netlab-DC"
+        folder: "_Courses/I3-DB01/I490343/Medewerkers"
+        state: "poweredon"
+        cluster: "Netlab-Cluster-B"
+        wait_for_ip_address: yes
+
+      delegate_to: localhost

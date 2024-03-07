@@ -1,0 +1,82 @@
+---
+- name: Deploy Multiple Web Services
+  hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - credentials.yml
+
+  vars_prompt:
+    - name: "vm_name_prefix"
+      prompt: "Enter the prefix for VM names:"
+      private: no
+    - name: "number_of_vms"
+      prompt: "Enter the number of VMs to deploy:"
+      private: no
+
+  tasks:
+    - name: Create VMs from template
+      vmware_guest:
+        hostname: "{{ vmware_hostname }}"
+        username: "{{ vmware_username }}"
+        password: "{{ vmware_password }}"
+        validate_certs: False
+        name: "{{ vm_name_prefix }}{{ '%02d' | format(item) }}"
+        template: "Web_Template"
+        resource_pool: "I490343"
+        datacenter: "Netlab-DC"
+        folder: "_Courses/I3-DB01/I490343/Web-Servers"
+        state: "poweredon"
+        cluster: "Netlab-Cluster-B"
+        wait_for_ip_address: yes
+      loop: "{{ range(1, number_of_vms | int + 1) | list }}"
+      loop_control:
+        loop_var: item
+      delegate_to: localhost
+      register: vm_creation_result
+
+    - name: Add dynamically created hosts to inventory
+      add_host:
+        name: "{{ item.instance.hw_eth0.ipaddresses[0] }}"
+        groups: dynamic_hosts
+      loop: "{{ vm_creation_result.results }}"
+      loop_control:
+        index_var: index
+
+    - name: Output IPs to inventory.txt
+      copy:
+        content: "{{ groups['dynamic_hosts'] | map('extract', hostvars, 'inventory_hostname') | list | join('\n') }}"
+        dest: inventory.txt
+
+- name: Install Apache2
+  hosts: dynamic_hosts
+  become: yes
+  vars_files:
+    - credentials.yml
+  vars:
+    ansible_ssh_pass: "{{ ssh_pass }}"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    ansible_become_pass: "{{ ssh_pass }}"
+  tasks:
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+
+    - name: Install Apache2, PHP, and the Apache PHP module
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apache2
+        - php
+        - libapache2-mod-php
+
+    - name: Copy index.php to /var/www/html/
+      copy:
+        src: website/index.php
+        dest: /var/www/html/index.php
+
+    - name: Remove index.html
+      file:
+        path: /var/www/html/index.html
+        state: absent

@@ -1,0 +1,33 @@
+---
+- name: Shutdown and delete a VM
+  hosts: localhost
+  gather_facts: no
+  vars_prompt:
+    - name: "vm_name"
+      prompt: "Enter the name of the VM:"
+      private: no
+
+  tasks:
+    - name: Include vault file
+      include_vars: credentials.yml
+
+    - name: Shutdown the VM
+      vmware_guest_powerstate:
+        hostname: "{{ vmware_hostname }}"
+        username: "{{ vmware_username }}"
+        password: "{{ vmware_password }}"
+        validate_certs: False
+        name: "{{ vm_name }}"
+        state: "powered-off"
+      delegate_to: localhost
+
+    - name: Delete the VM
+      vmware_guest:
+        hostname: "{{ vmware_hostname }}"
+        username: "{{ vmware_username }}"
+        password: "{{ vmware_password }}"
+        validate_certs: False
+        name: "{{ vm_name }}"
+        state: "absent"
+      delegate_to: localhost
+

@@ -29,23 +29,23 @@
         state: "poweredon"
         cluster: "Netlab-Cluster-B"
         wait_for_ip_address: yes
-      loop: "{{ range(1, number_of_vms | int + 1) | list }}"
+      loop: "{{ range(1, number_of_vms | int + 1) | list }}" # Loops over the range of VMs to deploy
       loop_control:
         loop_var: item
       delegate_to: localhost
-      register: vm_creation_result
+      register: vm_creation_result # Stores the result of VM creation for later use
 
     - name: Add dynamically created hosts to inventory
       add_host:
-        name: "{{ item.instance.hw_eth0.ipaddresses[0] }}"
+        name: "{{ item.instance.hw_eth0.ipaddresses[0] }}" # Retrieves the IP address of the created VM
         groups: dynamic_hosts
-      loop: "{{ vm_creation_result.results }}"
+      loop: "{{ vm_creation_result.results }}" # Loops over the results of VM creation
       loop_control:
         index_var: index
 
     - name: Output IPs to inventory.txt
       copy:
-        content: "{{ groups['dynamic_hosts'] | map('extract', hostvars, 'inventory_hostname') | list | join('\n') }}"
+        content: "{{ groups['dynamic_hosts'] | map('extract', hostvars, 'inventory_hostname') | list | join('\n') }}" # Generates content for the inventory file with IP addresses of dynamic hosts
         dest: inventory.txt
 
 - name: Install Apache2

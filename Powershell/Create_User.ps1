@@ -23,7 +23,14 @@ foreach ($row in $data) {
     $profilePath = "\\WIN-ULE5N582EEV\User-profiles\$username"
     Write-Host $homeFolder
 
-    # Creating the user
+    # Determine OU based on group name
+    $ou = switch ($groupName) {
+        "IT" { "OU=IT,DC=tacoroumen,DC=local" }
+        "Finance" { "OU=Finance,DC=tacoroumen,DC=local" }
+        "HR" { "OU=HR,DC=tacoroumen,DC=local" }
+    }
+
+    # Creating the user in specified OU
     Write-Host "Creating user: $fullName with username: $username"
     New-ADUser `
         -Name $fullName `
@@ -36,7 +43,8 @@ foreach ($row in $data) {
         -HomeDirectory $homeFolder `
         -ProfilePath $profilePath `
         -HomeDrive "H:" `
-        -ChangePasswordAtLogon:$true
+        -ChangePasswordAtLogon:$true `
+        -Path $ou
 
     New-Item $homeFolder -Type Directory
 

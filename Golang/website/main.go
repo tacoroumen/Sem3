@@ -55,7 +55,7 @@ func resetPassword(w http.ResponseWriter, r *http.Request) {
 	email, err := cmd.Output()
 	if err != nil {
 		http.Error(w, "Failed to retrieve email address", http.StatusInternalServerError)
-		return
+		//return
 	}
 
 	// Send an email to the retrieved email address (replace with your email sending logic)
@@ -67,9 +67,6 @@ func resetPassword(w http.ResponseWriter, r *http.Request) {
 
 // Dummy function to simulate sending an email
 func sendEmail(email string) {
-	// Replace this function with your actual email sending logic
-	// For example, you can use a third-party library like sendgrid-go or gomail
-	// This is just a placeholder
 	println("Sending email to:", email)
 	// Open and read the email configuration from a JSON file
 	file, err := os.Open("mail.json")

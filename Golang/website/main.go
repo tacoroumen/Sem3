@@ -1,10 +1,21 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
+	"net/smtp"
+	"os"
 	"os/exec"
 )
+
+type EmailConfig struct {
+	Mailadress  string `json:"mailadress"`
+	Wachtwoord  string `json:"wachtwoord"`
+	Smtp_server string `json:"smtp_server"`
+	Smtp_poort  int    `json:"smtp_poort"`
+}
 
 // Define a template for the HTML form
 var tpl = template.Must(template.New("").Parse(`
@@ -60,5 +71,36 @@ func sendEmail(email string) {
 	// For example, you can use a third-party library like sendgrid-go or gomail
 	// This is just a placeholder
 	println("Sending email to:", email)
+	// Open and read the email configuration from a JSON file
+	file, err := os.Open("mail.json")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
 
+	decoder := json.NewDecoder(file)
+	config := EmailConfig{}
+	err = decoder.Decode(&config)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	auth := smtp.PlainAuth("", config.Mailadress, config.Wachtwoord, config.Smtp_server)
+
+	to := []string{email}
+	subject := "Subject: " + "Reservation FonteynHolidayParks!" + "\r\n"
+	body := "Test email body"
+	msg := []byte(subject +
+		"\r\n" +
+		body)
+
+	err = smtp.SendMail(fmt.Sprintf("%s:%d", config.Smtp_server, config.Smtp_poort), auth, config.Mailadress, to, msg)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Email sent successfully!")
 }

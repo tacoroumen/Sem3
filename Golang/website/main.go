@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"math/rand"
 	"net/http"
 	"net/smtp"
 	"os"
 	"os/exec"
+	"strings"
+	"time"
 )
 
 type EmailConfig struct {
@@ -46,28 +49,60 @@ func showForm(w http.ResponseWriter, r *http.Request) {
 	tpl.Execute(w, nil)
 }
 
+// Function to generate a random string of given length
+func generateRandomString(length int) string {
+	rand.Seed(time.Now().UnixNano()) // Seed the random number generator with the current time
+
+	// Characters allowed in the random string
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*-_"
+
+	// Create a byte slice to store the random string
+	randomString := make([]byte, length)
+
+	// Generate random characters and append them to the byte slice
+	for i := 0; i < length; i++ {
+		randomString[i] = charset[rand.Intn(len(charset))]
+	}
+
+	// Convert the byte slice to a string and return
+	return string(randomString)
+}
+
 func resetPassword(w http.ResponseWriter, r *http.Request) {
 	// Get the username from the form submission
 	username := r.FormValue("username")
 
 	// Call the PowerShell script to get the email address
 	cmd := exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/GetEmail.ps1", "-Username", username)
-	email, err := cmd.Output()
+	emailBytes, err := cmd.Output()
 	if err != nil {
 		http.Error(w, "Failed to retrieve email address", http.StatusInternalServerError)
-		//return
+		return
 	}
 
+	// Trim any leading or trailing whitespace characters, including carriage returns and line feeds
+	email := strings.TrimSpace(string(emailBytes))
+
+	// Generate a random password of 8 characters
+	password := generateRandomString(8)
+
+	// Call the PowerShell script to reset the password
+	cmd = exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/ResetPassword.ps1", "-Username", username, "-Password", password)
+
 	// Send an email to the retrieved email address (replace with your email sending logic)
-	sendEmail(string(email))
+	sendEmail(email, password)
 
 	// Respond to the user indicating that the password reset email has been sent
-	w.Write([]byte("Password reset email has been sent to the provided email address"))
+	w.Write([]byte("Password reset email has been sent to your personal email address"))
 }
 
 // Dummy function to simulate sending an email
-func sendEmail(email string) {
+func sendEmail(email string, password string) {
+	// Replace this function with your actual email sending logic
+	// For example, you can use a third-party library like sendgrid-go or gomail
+	// This is just a placeholder
 	println("Sending email to:", email)
+
 	// Open and read the email configuration from a JSON file
 	file, err := os.Open("mail.json")
 	if err != nil {
@@ -87,8 +122,8 @@ func sendEmail(email string) {
 	auth := smtp.PlainAuth("", config.Mailadress, config.Wachtwoord, config.Smtp_server)
 
 	to := []string{email}
-	subject := "Subject: " + "Reservation FonteynHolidayParks!" + "\r\n"
-	body := "Test email body"
+	subject := "Subject: " + "Password reset!" + "\r\n"
+	body := "Your password has been reset. your new password is: " + password + "\r\n" + "Please change your password after login."
 	msg := []byte(subject +
 		"\r\n" +
 		body)

@@ -2,7 +2,7 @@
 Import-Module ActiveDirectory
 
 # Read CSV file
-$data = Import-Csv -Path "C:\Users\Administrator\Desktop\users.csv"
+$data = Import-Csv -Path "S:\HR\newusers.csv"
 
 # Iterate over each row
 foreach ($row in $data) {
@@ -21,7 +21,6 @@ foreach ($row in $data) {
     # Setting home folder and profile path
     $homeFolder = "\\WIN-ULE5N582EEV\Homefolder\$username"
     $profilePath = "\\WIN-ULE5N582EEV\User-profiles\$username"
-    Write-Host $homeFolder
 
     # Determine OU based on group name
     $ou = switch ($groupName) {
@@ -33,7 +32,7 @@ foreach ($row in $data) {
     # Creating the user in specified OU
     Write-Host "Creating user: $fullName with username: $username"
     New-ADUser `
-        -Name $fullName `
+        -Name $fullname `
         -GivenName $firstName `
         -Surname $lastName `
         -SamAccountName $username `
@@ -46,7 +45,23 @@ foreach ($row in $data) {
         -ChangePasswordAtLogon:$true `
         -Path $ou
 
+
     New-Item $homeFolder -Type Directory
+    New-Item $profilePath -Type Directory
+
+    $homeACL = Get-Acl $homeFolder
+    $homeRuleUser = New-Object System.Security.AccessControl.FileSystemAccessRule("$username","FullControl","ContainerInherit,ObjectInherit","None","Allow")
+    $homeRuleAdmin = New-Object System.Security.AccessControl.FileSystemAccessRule("Administrator","FullControl","ContainerInherit,ObjectInherit","None","Allow")
+    $homeACL.AddAccessRule($homeRuleUser)
+    $homeACL.AddAccessRule($homeRuleAdmin)
+    Set-Acl -Path $homeFolder -AclObject $homeACL
+
+    $profileACL = Get-Acl $profilePath
+    $profileRuleUser = New-Object System.Security.AccessControl.FileSystemAccessRule("$username","FullControl","ContainerInherit,ObjectInherit","None","Allow")
+    $profileRuleAdmin = New-Object System.Security.AccessControl.FileSystemAccessRule("Administrator","FullControl","ContainerInherit,ObjectInherit","None","Allow")
+    $profileACL.AddAccessRule($profileRuleUser)
+    $profileACL.AddAccessRule($profileRuleAdmin)
+    Set-Acl -Path $profilePath -AclObject $profileACL
 
     # Adding the user to the specified group
     Add-ADGroupMember -Identity "taco users" -Members $username

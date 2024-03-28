@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -85,8 +86,38 @@ var resetPasstpl = template.Must(template.New("").Parse(`
 </html>
 `))
 
+var resetKeyTpl = template.Must(template.New("").Parse(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Password Reset</title>
+</head>
+<body>
+    <h1>Password Reset</h1>
+    <form method="post" action="/reset-key">
+        <label for="password">New Password:</label>
+        <input type="password" id="password" name="password" required><br>
+        <label for="confirm-password">Confirm New Password:</label>
+        <input type="password" id="confirm-password" name="confirm-password" required><br>
+        <input type="hidden" name="reset-key" value="{{.ResetKey}}">
+        <button type="submit">Reset Password</button>
+    </form>
+</body>
+</html>
+`))
+
 // Map to store session IDs
 var sessions = make(map[string]struct{})
+
+var (
+	resetKeysMap map[string]string // Map to store reset keys linked to usernames
+	mutex        sync.Mutex        // Mutex for safe concurrent access to the map
+)
+
+func init() {
+	// Initialize the map
+	resetKeysMap = make(map[string]string)
+}
 
 func main() {
 	http.HandleFunc("/", showLogin)
@@ -94,6 +125,8 @@ func main() {
 	http.HandleFunc("/request-reset", showResetPassword)
 	http.HandleFunc("/reset", resetPassword)
 	http.HandleFunc("/request", requestApplicationHandler)
+	http.HandleFunc("/reset-key", showResetKeyPage)
+	http.HandleFunc("/reset-key-confirm", resetPasswordWithConfirmation)
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -263,6 +296,53 @@ func showResetPassword(w http.ResponseWriter, r *http.Request) {
 	resetPasstpl.Execute(w, nil)
 }
 
+func showResetKeyPage(w http.ResponseWriter, r *http.Request) {
+	resetKey := r.URL.Query().Get("reset-key")
+	if resetKey == "" {
+		http.Error(w, "Reset key not provided", http.StatusBadRequest)
+		return
+	}
+
+	// Render the reset password page with the reset key
+	resetKeyTpl.Execute(w, map[string]string{"ResetKey": resetKey})
+}
+
+func resetPasswordWithConfirmation(w http.ResponseWriter, r *http.Request) {
+	// Parse the form data
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Failed to parse form data", http.StatusInternalServerError)
+		return
+	}
+
+	// Get the reset key and passwords from the form submission
+	resetKey := r.Form.Get("reset-key")
+	password := r.Form.Get("password")
+	confirmPassword := r.Form.Get("confirm-password")
+
+	// Check if passwords match
+	if password != confirmPassword {
+		http.Error(w, "Passwords do not match", http.StatusBadRequest)
+		return
+	}
+
+	// Get the username associated with the reset key
+	username, ok := getUsernameFromResetKey(resetKey)
+	if !ok {
+		http.Error(w, "Invalid reset key", http.StatusBadRequest)
+		return
+	}
+
+	// Set the password for the user
+	setPassword(username, password)
+
+	// Remove the reset key from the map after successful password reset
+	removeResetKey(resetKey)
+
+	// Respond to the user indicating that the password has been reset
+	w.Write([]byte("Password reset successful"))
+}
+
 func resetPassword(w http.ResponseWriter, r *http.Request) {
 	// Get the username from the form submission
 	username := r.FormValue("username")
@@ -283,20 +363,44 @@ func resetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a random password of 8 characters
-	password := generateRandomString(8)
+	// Generate a random password of 21 characters (for temporary password reset link)
+	resetKey := generateRandomString(21) // Adjust the length of the reset key as needed
 
-	// Call the PowerShell script to reset the password
-	cmd = exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/ResetPassword.ps1", "-Username", username, "-Password", password)
+	// Store the reset key temporarily in the map linked to the username
+	storeResetKey(username, resetKey)
 
-	// Send an email to the retrieved email address (replace with your email sending logic)
-	sendEmailReset(email, password)
+	// Construct the reset URL with the reset key
+	resetURL := fmt.Sprintf("https://user.0x54.dev/reset-key?reset-key=%s", resetKey)
+
+	// Send an email to the retrieved email address
+	sendEmailReset(email, resetURL)
 
 	// Respond to the user indicating that the password reset email has been sent
-	w.Write([]byte("If user excists password reset email has been sent to your personal email address"))
+	w.Write([]byte("If user exists, a password reset email has been sent to your email address"))
 }
 
-func sendEmailReset(email string, password string) {
+func storeResetKey(username, resetKey string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	resetKeysMap[resetKey] = username
+}
+
+// Function to retrieve username linked to a reset key
+func getUsernameFromResetKey(resetKey string) (string, bool) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	username, ok := resetKeysMap[resetKey]
+	return username, ok
+}
+
+// Function to remove reset key from the map after it's been used
+func removeResetKey(resetKey string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	delete(resetKeysMap, resetKey)
+}
+
+func sendEmailReset(email, resetURL string) {
 	// Replace this function with your actual email sending logic
 	// For example, you can use a third-party library like sendgrid-go or gomail
 	// This is just a placeholder
@@ -322,7 +426,7 @@ func sendEmailReset(email string, password string) {
 
 	to := []string{email}
 	subject := "Subject: " + "Password reset!" + "\r\n"
-	body := "Your password has been reset. your new password is: " + password + "\r\n" + "You will need to change your password after login."
+	body := "Your password can be reset by the following link: " + resetURL
 	msg := []byte(subject +
 		"\r\n" +
 		body)
@@ -338,4 +442,8 @@ func sendEmailReset(email string, password string) {
 
 func generateResetKey() string {
 	return generateRandomString(21) // You can adjust the length as needed
+}
+
+func setPassword(username, password string) {
+	exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/ResetPassword.ps1", "-Username", username, "-Password", password)
 }

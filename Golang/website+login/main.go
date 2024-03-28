@@ -303,6 +303,14 @@ func showResetKeyPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the reset key is valid
+	_, ok := getUsernameFromResetKey(resetKey)
+	if !ok {
+		// If the reset key is not valid, forward to another route (e.g., "/")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
 	// Render the reset password page with the reset key
 	resetKeyTpl.Execute(w, map[string]string{"ResetKey": resetKey})
 }

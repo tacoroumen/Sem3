@@ -94,7 +94,7 @@ var resetKeyTpl = template.Must(template.New("").Parse(`
 </head>
 <body>
     <h1>Password Reset</h1>
-    <form method="post" action="/reset-key">
+    <form method="post" action="/reset-key-confirm">
         <label for="password">New Password:</label>
         <input type="password" id="password" name="password" required><br>
         <label for="confirm-password">Confirm New Password:</label>
@@ -370,7 +370,7 @@ func resetPassword(w http.ResponseWriter, r *http.Request) {
 	storeResetKey(username, resetKey)
 
 	// Construct the reset URL with the reset key
-	resetURL := fmt.Sprintf("https://user.0x54.dev/reset-key?reset-key=%s", resetKey)
+	resetURL := fmt.Sprintf("https://users.0x54.dev/reset-key?reset-key=%s", resetKey)
 
 	// Send an email to the retrieved email address
 	sendEmailReset(email, resetURL)

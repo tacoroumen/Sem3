@@ -60,7 +60,7 @@ foreach ($row in $data) {
         -Path $ou
 
     # Sending email to the user with the generated password'
-    Invoke-Expression -Command "go run C:\Users\Administrator\Documents\GitHub\Sem3\Golang\send_mail.go -fullname '$fullname' -username '$username' -password '$password' -email '$emailAddress'"
+    Invoke-Expression -Command "go run C:\Users\Administrator\Desktop\send_mail.go -fullname '$fullname' -username '$username' -password '$password' -email '$emailAddress'"
 
 
     New-Item $homeFolder -Type Directory

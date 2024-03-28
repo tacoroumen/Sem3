@@ -42,8 +42,6 @@ var loginTpl = template.Must(template.New("").Parse(`
     <script>
         function forgotPassword() {
             // Redirect the user to the forgot password page or show a modal for password recovery
-            // Example: window.location.href = "/forgot-password";
-            alert("Redirecting to forgot password page...");
 			window.location.href = "/request-reset";
         }
     </script>
@@ -91,14 +89,32 @@ var resetKeyTpl = template.Must(template.New("").Parse(`
 <html>
 <head>
     <title>Password Reset</title>
+    <script>
+        // Function to check if the passwords match
+        function checkPasswordMatch() {
+            var password = document.getElementById("password").value;
+            var confirmPassword = document.getElementById("confirm-password").value;
+
+            if (password != confirmPassword) {
+                // Passwords don't match, show error message
+                document.getElementById("password-error").innerHTML = "Passwords do not match!";
+                return false;
+            } else {
+                // Passwords match, clear error message
+                document.getElementById("password-error").innerHTML = "";
+                return true;
+            }
+        }
+    </script>
 </head>
 <body>
     <h1>Password Reset</h1>
-    <form method="post" action="/reset-key-confirm">
+    <form method="post" action="/reset-key-confirm" onsubmit="return checkPasswordMatch();">
         <label for="password">New Password:</label>
         <input type="password" id="password" name="password" required><br>
         <label for="confirm-password">Confirm New Password:</label>
-        <input type="password" id="confirm-password" name="confirm-password" required><br>
+        <input type="password" id="confirm-password" name="confirm-password" required>
+        <span id="password-error" style="color: red;"></span><br>
         <input type="hidden" name="reset-key" value="{{.ResetKey}}">
         <button type="submit">Reset Password</button>
     </form>
@@ -243,7 +259,7 @@ func generateRandomString(length int) string {
 	rand.Seed(time.Now().UnixNano()) // Seed the random number generator with the current time
 
 	// Characters allowed in the random string
-	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*-_"
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 	// Create a byte slice to store the random string
 	randomString := make([]byte, length)
@@ -304,12 +320,12 @@ func showResetKeyPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if the reset key is valid
-	_, ok := getUsernameFromResetKey(resetKey)
-	if !ok {
-		// If the reset key is not valid, forward to another route (e.g., "/")
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
+	//_, ok := getUsernameFromResetKey(resetKey)
+	//if !ok {
+	//	// If the reset key is not valid, forward to another route (e.g., "/")
+	//	http.Redirect(w, r, "/", http.StatusSeeOther)
+	//	return
+	//}
 
 	// Render the reset password page with the reset key
 	resetKeyTpl.Execute(w, map[string]string{"ResetKey": resetKey})

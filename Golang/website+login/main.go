@@ -275,7 +275,7 @@ func generateRandomString(length int) string {
 
 func sendEmail(username string, appName string) {
 	// Open and read the email configuration from a JSON file
-	file, err := os.Open("mail.json")
+	file, err := os.Open("C:/Users/Administrator/Desktop/Website/mail.json")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -431,7 +431,7 @@ func sendEmailReset(email, resetURL string) {
 	println("Sending email to:", email)
 
 	// Open and read the email configuration from a JSON file
-	file, err := os.Open("mail.json")
+	file, err := os.Open("C:/Users/Administrator/Desktop/Website/mail.json")
 	if err != nil {
 		fmt.Println(err)
 		return

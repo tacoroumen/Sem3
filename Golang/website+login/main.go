@@ -232,12 +232,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 	//	http.Error(w, "Failed to authenticate user", http.StatusUnauthorized)
 	//	return
 	//}
+
 	output, err := session.CombinedOutput("powershell.exe -File C:/Users/Administrator/Desktop/Authenticate.ps1 -Username " + username + " -Password " + password)
 	if err != nil {
 		log.Fatalf("Failed to execute PowerShell script: %v", err)
 	}
-
-	log.Printf("Output of the script: %s", output)
 
 	// Check the output of the script
 	if strings.TrimSpace(string(output)) == "Authentication successful" {
@@ -439,13 +438,36 @@ func resetPassword(w http.ResponseWriter, r *http.Request) {
 	// Get the username from the form submission
 	username := r.FormValue("username")
 
-	// Call the PowerShell script to get the email address
-	cmd := exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/GetEmail.ps1", "-Username", username)
-	emailBytes, err := cmd.Output()
-	if err != nil {
-		http.Error(w, "Failed to retrieve email address", http.StatusInternalServerError)
+	// Establish SSH connection
+	client := establishSSHConnection()
+	if client == nil {
+		http.Error(w, "Failed to establish SSH connection", http.StatusInternalServerError)
 		return
 	}
+	defer client.Close()
+
+	// Session for executing commands on the remote machine
+	session, err := client.NewSession()
+	if err != nil {
+		http.Error(w, "Failed to create SSH session", http.StatusInternalServerError)
+		return
+	}
+	defer session.Close()
+
+	output, err := session.CombinedOutput("powershell.exe -File C:/Users/Administrator/Desktop/GetEmail.ps1 -Username " + username)
+	if err != nil {
+		log.Fatalf("Failed to execute PowerShell script: %v", err)
+	}
+
+	emailBytes := output
+
+	// Call the PowerShell script to get the email address
+	//cmd := exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/GetEmail.ps1", "-Username", username)
+	//emailBytes, err := cmd.Output()
+	//if err != nil {
+	//	http.Error(w, "Failed to retrieve email address", http.StatusInternalServerError)
+	//	return
+	//}
 
 	// Trim any leading or trailing whitespace characters, including carriage returns and line feeds
 	email := strings.TrimSpace(string(emailBytes))
@@ -532,10 +554,26 @@ func sendEmailReset(email, resetURL string) {
 	fmt.Println("Email sent successfully!")
 }
 
-func generateResetKey() string {
-	return generateRandomString(21) // You can adjust the length as needed
-}
-
 func setPassword(username, password string) {
+	// Establish SSH connection
+	client := establishSSHConnection()
+	if client == nil {
+		fmt.Printf("Failed to establish SSH connection", http.StatusInternalServerError)
+		return
+	}
+	defer client.Close()
+
+	// Session for executing commands on the remote machine
+	session, err := client.NewSession()
+	if err != nil {
+		fmt.Printf("Failed to create SSH session", http.StatusInternalServerError)
+		return
+	}
+	defer session.Close()
+
+	session.CombinedOutput("powershell.exe -File C:/Users/Administrator/Desktop/GetEmail.ps1 -Username " + username)
+	if err != nil {
+		log.Fatalf("Failed to execute PowerShell script: %v", err)
+	}
 	exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/ResetPassword.ps1", "-Username", username, "-Password", password)
 }

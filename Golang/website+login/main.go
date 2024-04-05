@@ -150,9 +150,13 @@ func showLogin(w http.ResponseWriter, r *http.Request) {
 	// Check if session ID cookie exists
 	cookie, err := r.Cookie("session_id")
 	if err == nil && cookie != nil {
-		// Session ID cookie exists, redirect to "/request"
-		http.Redirect(w, r, "/request", http.StatusSeeOther)
-		return
+		// Session ID cookie exists, check if it's valid
+		sessionID := cookie.Value
+		if _, valid := sessions[sessionID]; valid {
+			// Session ID is valid, redirect to "/request"
+			http.Redirect(w, r, "/request", http.StatusSeeOther)
+			return
+		}
 	}
 
 	// Render the login form

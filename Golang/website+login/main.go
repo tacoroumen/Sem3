@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/smtp"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 type EmailConfig struct {
@@ -19,6 +22,12 @@ type EmailConfig struct {
 	Wachtwoord  string `json:"wachtwoord"`
 	Smtp_server string `json:"smtp_server"`
 	Smtp_poort  int    `json:"smtp_poort"`
+}
+
+type SSHConfig struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Host     string `json:"host"`
 }
 
 // Define a template for the HTML login form
@@ -146,6 +155,38 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 
+func establishSSHConnection() *ssh.Client {
+	file, err := os.Open("ssh.json")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	sshconfig := SSHConfig{}
+	err = decoder.Decode(&sshconfig)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// Replace these values with your SSH server credentials
+	config := &ssh.ClientConfig{
+		User: sshconfig.User,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(sshconfig.Password),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	// Replace "ssh.example.com:22" with your SSH server address and port
+	client, err := ssh.Dial("tcp", sshconfig.Host, config)
+	if err != nil {
+		fmt.Println("Failed to establish SSH connection:", err)
+		return nil
+	}
+
+	return client
+}
+
 func showLogin(w http.ResponseWriter, r *http.Request) {
 	// Check if session ID cookie exists
 	cookie, err := r.Cookie("session_id")
@@ -168,13 +209,35 @@ func login(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	// Call the PowerShell script to authenticate the user
-	cmd := exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/Authenticate.ps1", "-Username", username, "-Password", password)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// Establish SSH connection
+	client := establishSSHConnection()
+	if client == nil {
+		http.Error(w, "Failed to establish SSH connection", http.StatusInternalServerError)
 		return
 	}
+	defer client.Close()
+
+	// Session for executing commands on the remote machine
+	session, err := client.NewSession()
+	if err != nil {
+		http.Error(w, "Failed to create SSH session", http.StatusInternalServerError)
+		return
+	}
+	defer session.Close()
+
+	// Call the PowerShell script to authenticate the user
+	//cmd := exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/Authenticate.ps1", "-Username", username, "-Password", password)
+	//output, err := cmd.CombinedOutput()
+	//if err != nil {
+	//	http.Error(w, "Failed to authenticate user", http.StatusUnauthorized)
+	//	return
+	//}
+	output, err := session.CombinedOutput("powershell.exe -File C:/Users/Administrator/Desktop/Authenticate.ps1 -Username " + username + " -Password " + password)
+	if err != nil {
+		log.Fatalf("Failed to execute PowerShell script: %v", err)
+	}
+
+	log.Printf("Output of the script: %s", output)
 
 	// Check the output of the script
 	if strings.TrimSpace(string(output)) == "Authentication successful" {
@@ -288,7 +351,7 @@ func generateRandomString(length int) string {
 
 func sendEmail(username string, appName string) {
 	// Open and read the email configuration from a JSON file
-	file, err := os.Open("C:/Users/Administrator/Desktop/Website/mail.json")
+	file, err := os.Open("mail.json")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -436,7 +499,7 @@ func sendEmailReset(email, resetURL string) {
 	println("Sending email to:", email)
 
 	// Open and read the email configuration from a JSON file
-	file, err := os.Open("C:/Users/Administrator/Desktop/Website/mail.json")
+	file, err := os.Open("mail.json")
 	if err != nil {
 		fmt.Println(err)
 		return

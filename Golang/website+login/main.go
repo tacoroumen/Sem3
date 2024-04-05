@@ -147,6 +147,15 @@ func main() {
 }
 
 func showLogin(w http.ResponseWriter, r *http.Request) {
+	// Check if session ID cookie exists
+	cookie, err := r.Cookie("session_id")
+	if err == nil && cookie != nil {
+		// Session ID cookie exists, redirect to "/request"
+		http.Redirect(w, r, "/request", http.StatusSeeOther)
+		return
+	}
+
+	// Render the login form
 	loginTpl.Execute(w, nil)
 }
 
@@ -318,14 +327,6 @@ func showResetKeyPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Reset key not provided", http.StatusBadRequest)
 		return
 	}
-
-	// Check if the reset key is valid
-	//_, ok := getUsernameFromResetKey(resetKey)
-	//if !ok {
-	//	// If the reset key is not valid, forward to another route (e.g., "/")
-	//	http.Redirect(w, r, "/", http.StatusSeeOther)
-	//	return
-	//}
 
 	// Render the reset password page with the reset key
 	resetKeyTpl.Execute(w, map[string]string{"ResetKey": resetKey})

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/smtp"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -571,9 +570,9 @@ func setPassword(username, password string) {
 	}
 	defer session.Close()
 
-	session.CombinedOutput("powershell.exe -File C:/Users/Administrator/Desktop/GetEmail.ps1 -Username " + username)
+	session.CombinedOutput("powershell.exe -File C:/Users/Administrator/Desktop/ResetPassword.ps1 -Username " + username + " -Password " + password)
 	if err != nil {
 		log.Fatalf("Failed to execute PowerShell script: %v", err)
 	}
-	exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/ResetPassword.ps1", "-Username", username, "-Password", password)
+	//exec.Command("powershell", "-File", "C:/Users/Administrator/Desktop/ResetPassword.ps1", "-Username", username, "-Password", password)
 }
